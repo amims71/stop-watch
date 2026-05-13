@@ -1,0 +1,523 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0f0f10">
+<title>Activity Stopwatch</title>
+<style>
+  :root {
+    --bg: #0f0f10;
+    --tile: #1c1c1f;
+    --tile-active: #2d6cdf;
+    --tile-active-glow: rgba(45, 108, 223, .35);
+    --text: #f0f0f2;
+    --text-dim: #8a8a90;
+    --divider: rgba(255,255,255,.08);
+    --idle: #2a2a2e;
+    --idle-armed: #c4453c;
+    --safe-bottom: env(safe-area-inset-bottom, 0);
+    --safe-top: env(safe-area-inset-top, 0);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overscroll-behavior: none; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+  }
+  button, input { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+  input { cursor: text; }
+
+  .screen { display: none; height: 100dvh; flex-direction: column; padding: calc(var(--safe-top) + 8px) 8px calc(var(--safe-bottom) + 8px); }
+  .screen.active { display: flex; }
+
+  /* --- Setup --- */
+  #setup { padding: calc(var(--safe-top) + 20px) 20px calc(var(--safe-bottom) + 20px); gap: 16px; }
+  #setup h1 { font-size: 22px; font-weight: 600; }
+  .setup-row { display: flex; align-items: center; gap: 12px; }
+  .setup-row label { flex: 0 0 60px; color: var(--text-dim); }
+  .setup-row input { flex: 1; background: var(--tile); color: var(--text); border: 1px solid var(--divider); border-radius: 10px; padding: 12px; font-size: 16px; }
+  .activity-inputs { display: flex; flex-direction: column; gap: 8px; flex: 1; overflow-y: auto; }
+  .activity-inputs input { width: 100%; background: var(--tile); color: var(--text); border: 1px solid var(--divider); border-radius: 10px; padding: 12px; font-size: 16px; }
+  .setup-actions { display: flex; gap: 8px; padding-top: 12px; }
+  .btn { background: var(--tile); padding: 14px 18px; border-radius: 12px; font-size: 16px; flex: 1; text-align: center; }
+  .btn.primary { background: var(--tile-active); color: #fff; font-weight: 600; }
+
+  /* --- Track --- */
+  #track { gap: 8px; }
+  .status-bar { display: flex; align-items: center; gap: 8px; padding: 4px 10px; font-variant-numeric: tabular-nums; font-size: 13px; color: var(--text-dim); }
+  .status-bar .timer { color: var(--text); font-weight: 600; min-width: 48px; }
+  .status-bar .running { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .status-bar .done { background: var(--tile); padding: 8px 14px; border-radius: 10px; font-size: 13px; color: var(--text); }
+  .status-bar .speed { background: var(--tile); padding: 8px 12px; border-radius: 10px; font-size: 13px; color: var(--text); font-variant-numeric: tabular-nums; min-width: 52px; font-weight: 600; }
+  .status-bar .speed:active { background: #3a3a3e; }
+
+  .grid { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; min-height: 0; }
+
+  .tile {
+    position: relative; background: var(--tile); border-radius: 16px; overflow: hidden;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    transition: background .15s, box-shadow .15s, transform .1s;
+  }
+  .tile.active { background: var(--tile-active); box-shadow: 0 0 24px var(--tile-active-glow); }
+  .tile .name { font-size: 18px; font-weight: 600; padding: 0 8px; text-align: center; word-break: break-word; }
+  .tile .time { font-size: 24px; font-variant-numeric: tabular-nums; margin-top: 6px; opacity: .9; font-weight: 500; }
+  .tile .count { font-size: 11px; color: var(--text-dim); margin-top: 4px; letter-spacing: .5px; }
+  .tile.active .count { color: rgba(255,255,255,.75); }
+
+  /* Vertical divider down the middle */
+  .tile::before {
+    content: ''; position: absolute; left: 50%; top: 22%; bottom: 22%; width: 1px;
+    background: var(--divider); transform: translateX(-.5px); pointer-events: none;
+  }
+  .tile.active::before { background: rgba(255,255,255,.18); }
+
+  /* Tap zones */
+  .tile .zone {
+    position: absolute; top: 0; bottom: 0; width: 50%;
+    display: flex; align-items: flex-start;
+    font-size: 13px; color: var(--text-dim); opacity: .55;
+    background: transparent;
+  }
+  .tile .zone.left  { left: 0;  justify-content: flex-start; padding: 8px 0 0 10px; }
+  .tile .zone.right { right: 0; justify-content: flex-end;   padding: 8px 10px 0 0; }
+  .tile .zone:active { background: rgba(255,255,255,.06); }
+  .tile.active .zone { color: rgba(255,255,255,.7); }
+
+  .idle-bar {
+    background: var(--idle); border-radius: 16px; padding: 18px; text-align: center;
+    font-size: 16px; font-weight: 600; color: var(--text-dim);
+    transition: background .15s, color .15s;
+  }
+  .idle-bar:active { background: #3a3a3e; }
+  .idle-bar.armed { color: #fff; background: var(--idle-armed); }
+
+  /* --- Summary --- */
+  #summary { gap: 12px; padding: calc(var(--safe-top) + 12px) 12px calc(var(--safe-bottom) + 12px); overflow-y: auto; }
+  #summary header { display: flex; align-items: center; gap: 8px; }
+  #summary header h2 { flex: 1; font-size: 20px; }
+  .tabs { display: flex; background: var(--tile); border-radius: 10px; padding: 4px; gap: 4px; }
+  .tabs button { padding: 10px 14px; border-radius: 8px; font-size: 14px; color: var(--text-dim); flex: 1; }
+  .tabs button.on { background: var(--bg); color: var(--text); }
+
+  .summary-list, .details-list { display: flex; flex-direction: column; gap: 8px; }
+  .summary-row { display: flex; align-items: center; gap: 12px; background: var(--tile); padding: 14px; border-radius: 12px; }
+  .summary-row .bar { flex: 1; height: 6px; background: var(--divider); border-radius: 3px; overflow: hidden; }
+  .summary-row .bar > div { height: 100%; background: var(--tile-active); }
+  .summary-row .name { flex: 0 0 auto; min-width: 56px; font-weight: 600; }
+  .summary-row .total { font-variant-numeric: tabular-nums; min-width: 60px; text-align: right; }
+  .summary-row .pct { color: var(--text-dim); font-size: 12px; min-width: 36px; text-align: right; }
+
+  .detail-block { background: var(--tile); border-radius: 12px; overflow: hidden; }
+  .detail-block summary { padding: 14px; cursor: pointer; display: flex; justify-content: space-between; list-style: none; }
+  .detail-block summary::-webkit-details-marker { display: none; }
+  .detail-block summary::before { content: '▸'; color: var(--text-dim); margin-right: 8px; transition: transform .15s; display: inline-block; }
+  .detail-block[open] summary::before { transform: rotate(90deg); }
+  .detail-block summary .meta { color: var(--text-dim); font-size: 13px; font-variant-numeric: tabular-nums; margin-left: auto; }
+  .detail-block summary strong { flex: 1; }
+  .detail-block .sessions { padding: 0 14px 12px; font-variant-numeric: tabular-nums; font-size: 13px; }
+  .detail-block .sessions > div { padding: 8px 0; border-top: 1px solid var(--divider); display: flex; justify-content: space-between; color: var(--text-dim); }
+  .detail-block .sessions > div strong { color: var(--text); font-weight: 500; }
+
+  .footer-actions { display: flex; gap: 8px; padding-top: 8px; }
+  .footer-actions .btn.danger { background: transparent; color: var(--idle-armed); border: 1px solid var(--idle-armed); }
+</style>
+</head>
+<body>
+
+<!-- SETUP -->
+<section id="setup" class="screen active">
+  <h1>Setup activities</h1>
+  <div class="setup-row">
+    <label for="count">Count</label>
+    <input id="count" type="number" min="1" max="12" value="6" inputmode="numeric">
+  </div>
+  <div class="activity-inputs" id="activityInputs"></div>
+  <div class="setup-actions">
+    <button class="btn primary" id="startBtn">Start tracking</button>
+  </div>
+</section>
+
+<!-- TRACK -->
+<section id="track" class="screen">
+  <div class="status-bar">
+    <span class="timer" id="masterTimer">00:00</span>
+    <span class="running" id="runningLabel">— idle —</span>
+    <button class="speed" id="speedBtn">1×</button>
+    <button class="done" id="doneBtn">Done</button>
+  </div>
+  <div class="grid" id="grid"></div>
+  <button class="idle-bar" id="idleBar">Idle / Stop all</button>
+</section>
+
+<!-- SUMMARY -->
+<section id="summary" class="screen">
+  <header>
+    <h2>Results</h2>
+    <button class="btn" id="backBtn" style="flex:0 0 auto; padding:10px 14px;">Back</button>
+  </header>
+  <div class="tabs">
+    <button class="on" data-tab="summary">Summary</button>
+    <button data-tab="details">Details</button>
+  </div>
+  <div id="summaryList" class="summary-list"></div>
+  <div id="detailsList" class="details-list" style="display:none;"></div>
+  <div class="footer-actions">
+    <button class="btn danger" id="resetBtn">Reset all</button>
+  </div>
+</section>
+
+<script>
+const SPEEDS = [1, 1.25, 1.5, 1.75, 2];
+
+const state = {
+  activities: [],         // { id, name, sessions: [{ segments: [{ start, end|null, speed }] }] }
+  startedAt: null,
+  speed: 1,
+  globalSegments: [],     // [{ start, end|null, speed }] — tracks effective video time
+};
+
+const $  = (s) => document.querySelector(s);
+const $$ = (s) => document.querySelectorAll(s);
+
+const buzz = (p) => navigator.vibrate && navigator.vibrate(p);
+
+function fmt(ms) {
+  if (!ms || ms < 0) ms = 0;
+  const s = Math.floor(ms / 1000);
+  const m = Math.floor(s / 60);
+  const ss = String(s % 60).padStart(2, '0');
+  if (m < 60) return `${String(m).padStart(2,'0')}:${ss}`;
+  const h = Math.floor(m / 60);
+  return `${h}:${String(m % 60).padStart(2,'0')}:${ss}`;
+}
+
+const fmtSpeed = (s) => s + '×';
+
+function totalFor(a, now = Date.now()) {
+  let total = 0;
+  for (const s of a.sessions)
+    for (const seg of s.segments)
+      total += ((seg.end ?? now) - seg.start) * seg.speed;
+  return total;
+}
+
+function sessionDuration(s, now = Date.now()) {
+  let total = 0;
+  for (const seg of s.segments)
+    total += ((seg.end ?? now) - seg.start) * seg.speed;
+  return total;
+}
+
+function isRunning(a) {
+  const last = a.sessions[a.sessions.length - 1];
+  if (!last) return false;
+  const lastSeg = last.segments[last.segments.length - 1];
+  return lastSeg.end === null;
+}
+
+function masterEffectiveMs(now = Date.now()) {
+  let total = 0;
+  for (const seg of state.globalSegments)
+    total += ((seg.end ?? now) - seg.start) * seg.speed;
+  return total;
+}
+
+function wallToVideo(wall) {
+  const now = Date.now();
+  let video = 0;
+  for (const seg of state.globalSegments) {
+    const segEnd = seg.end ?? now;
+    if (wall >= segEnd) video += (segEnd - seg.start) * seg.speed;
+    else if (wall > seg.start) { video += (wall - seg.start) * seg.speed; break; }
+    else break;
+  }
+  return video;
+}
+
+const escapeHtml = (s) => String(s).replace(/[&<>"']/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+// --- Persistence ---
+const STORAGE_KEY = 'stopwatch.v1';
+
+function currentScreen() {
+  if ($('#track').classList.contains('active')) return 'track';
+  if ($('#summary').classList.contains('active')) return 'summary';
+  return 'setup';
+}
+
+function save() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      activities: state.activities,
+      startedAt: state.startedAt,
+      speed: state.speed,
+      globalSegments: state.globalSegments,
+      screen: currentScreen(),
+    }));
+  } catch (e) {}
+}
+
+function clearStorage() {
+  try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+}
+
+function load() {
+  let data;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    data = JSON.parse(raw);
+  } catch (e) { return false; }
+  if (!data || !Array.isArray(data.activities) || data.activities.length === 0) return false;
+  state.activities = data.activities;
+  state.startedAt = data.startedAt || null;
+  state.speed = data.speed || 1;
+  state.globalSegments = Array.isArray(data.globalSegments) ? data.globalSegments : [];
+  renderGrid();
+  updateSpeedBtn();
+  const screen = data.screen === 'summary' ? 'summary' : 'track';
+  if (screen === 'summary') renderSummary();
+  go(screen);
+  updateTiles();
+  return true;
+}
+
+// --- Setup ---
+function renderSetupInputs() {
+  const n = Math.max(1, Math.min(12, Number($('#count').value) || 1));
+  const wrap = $('#activityInputs');
+  const existing = [...wrap.querySelectorAll('input')].map(i => i.value);
+  wrap.innerHTML = '';
+  for (let i = 0; i < n; i++) {
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.placeholder = `Activity ${i + 1}`;
+    inp.value = existing[i] || `a${i + 1}`;
+    wrap.appendChild(inp);
+  }
+}
+$('#count').addEventListener('input', renderSetupInputs);
+
+$('#startBtn').addEventListener('click', () => {
+  const names = [...$('#activityInputs').querySelectorAll('input')]
+    .map(i => i.value.trim() || 'untitled');
+  const now = Date.now();
+  state.activities = names.map((name, i) => ({ id: i, name, sessions: [] }));
+  state.startedAt = now;
+  state.speed = 1;
+  state.globalSegments = [{ start: now, end: null, speed: 1 }];
+  renderGrid();
+  updateSpeedBtn();
+  go('track');
+  updateTiles();
+  save();
+});
+
+// --- Track ---
+function renderGrid() {
+  const grid = $('#grid');
+  grid.innerHTML = '';
+  state.activities.forEach((a) => {
+    const tile = document.createElement('div');
+    tile.className = 'tile';
+    tile.dataset.id = a.id;
+    tile.innerHTML = `
+      <div class="name">${escapeHtml(a.name)}</div>
+      <div class="time" data-time>00:00</div>
+      <div class="count" data-count>—</div>
+      <button class="zone left"  data-act="toggle" aria-label="Toggle ${escapeHtml(a.name)}">+</button>
+      <button class="zone right" data-act="solo"   aria-label="Solo ${escapeHtml(a.name)}">▶</button>
+    `;
+    grid.appendChild(tile);
+  });
+}
+
+$('#grid').addEventListener('click', (e) => {
+  const zone = e.target.closest('.zone');
+  if (!zone) return;
+  const tile = zone.closest('.tile');
+  const a = state.activities[Number(tile.dataset.id)];
+  const act = zone.dataset.act;
+
+  if (act === 'toggle') {
+    if (isRunning(a)) stop(a); else start(a);
+    buzz(20);
+  } else {
+    state.activities.forEach(x => { if (x !== a && isRunning(x)) stop(x); });
+    if (!isRunning(a)) start(a);
+    buzz([15, 40, 15]);
+  }
+  updateTiles();
+  save();
+});
+
+function start(a) {
+  if (isRunning(a)) return;
+  a.sessions.push({ segments: [{ start: Date.now(), end: null, speed: state.speed }] });
+}
+function stop(a) {
+  const last = a.sessions[a.sessions.length - 1];
+  if (!last) return;
+  const lastSeg = last.segments[last.segments.length - 1];
+  if (lastSeg.end === null) lastSeg.end = Date.now();
+}
+function stopAll() {
+  state.activities.forEach(a => { if (isRunning(a)) stop(a); });
+}
+
+function setSpeed(next) {
+  if (next === state.speed) return;
+  const now = Date.now();
+  const gLast = state.globalSegments[state.globalSegments.length - 1];
+  if (gLast && gLast.end === null) gLast.end = now;
+  state.globalSegments.push({ start: now, end: null, speed: next });
+  state.activities.forEach(a => {
+    if (!isRunning(a)) return;
+    const lastSess = a.sessions[a.sessions.length - 1];
+    const lastSeg = lastSess.segments[lastSess.segments.length - 1];
+    lastSeg.end = now;
+    lastSess.segments.push({ start: now, end: null, speed: next });
+  });
+  state.speed = next;
+  updateSpeedBtn();
+  updateTiles();
+  buzz(10);
+  save();
+}
+
+function updateSpeedBtn() {
+  const b = $('#speedBtn');
+  if (b) b.textContent = fmtSpeed(state.speed);
+}
+
+$('#speedBtn').addEventListener('click', () => {
+  const i = SPEEDS.indexOf(state.speed);
+  setSpeed(SPEEDS[(i + 1) % SPEEDS.length]);
+});
+
+$('#idleBar').addEventListener('click', () => {
+  const was = state.activities.some(isRunning);
+  stopAll();
+  if (was) buzz(40);
+  updateTiles();
+  save();
+});
+
+$('#doneBtn').addEventListener('click', () => {
+  stopAll();
+  const gLast = state.globalSegments[state.globalSegments.length - 1];
+  if (gLast && gLast.end === null) gLast.end = Date.now();
+  renderSummary();
+  go('summary');
+  save();
+});
+
+function updateTiles() {
+  const now = Date.now();
+  state.activities.forEach((a) => {
+    const tile = $(`.tile[data-id="${a.id}"]`);
+    if (!tile) return;
+    const running = isRunning(a);
+    tile.classList.toggle('active', running);
+    tile.querySelector('[data-time]').textContent = fmt(totalFor(a, now));
+    const c = a.sessions.length;
+    tile.querySelector('[data-count]').textContent = c === 0 ? '—' : `× ${c}`;
+  });
+  $('#masterTimer').textContent = state.startedAt ? fmt(masterEffectiveMs(now)) : '00:00';
+  const running = state.activities.filter(isRunning).map(a => a.name);
+  $('#runningLabel').textContent = running.length ? '▶ ' + running.join(' · ') : '— idle —';
+  $('#idleBar').classList.toggle('armed', running.length > 0);
+}
+
+setInterval(() => { if ($('#track').classList.contains('active')) updateTiles(); }, 250);
+
+// --- Summary ---
+function renderSummary() {
+  const list = $('#summaryList');
+  const details = $('#detailsList');
+  list.innerHTML = '';
+  details.innerHTML = '';
+  const now = Date.now();
+  const rows = state.activities.map(a => ({ a, total: totalFor(a, now) }));
+  const max = Math.max(1, ...rows.map(r => r.total));
+  const grand = rows.reduce((s, r) => s + r.total, 0) || 1;
+
+  rows.forEach(({ a, total }) => {
+    const pct = Math.round(100 * total / grand);
+    const row = document.createElement('div');
+    row.className = 'summary-row';
+    row.innerHTML = `
+      <div class="name">${escapeHtml(a.name)}</div>
+      <div class="bar"><div style="width:${(100 * total / max).toFixed(1)}%"></div></div>
+      <div class="total">${fmt(total)}</div>
+      <div class="pct">${pct}%</div>
+    `;
+    list.appendChild(row);
+
+    const block = document.createElement('details');
+    block.className = 'detail-block';
+    const sessionRows = a.sessions.map((s, i) => {
+      const dur = sessionDuration(s, now);
+      const segs = s.segments;
+      const from = wallToVideo(segs[0].start);
+      const to = wallToVideo(segs[segs.length - 1].end ?? now);
+      const speeds = [...new Set(segs.map(g => g.speed))];
+      const speedLabel = speeds.length === 1 ? ` · ${fmtSpeed(speeds[0])}` : ' · mixed';
+      return `<div><span>#${i + 1} &nbsp; ${fmt(from)} → ${fmt(to)}${speedLabel}</span><strong>${fmt(dur)}</strong></div>`;
+    }).join('') || `<div><span>no sessions</span><span></span></div>`;
+    block.innerHTML = `
+      <summary>
+        <strong>${escapeHtml(a.name)}</strong>
+        <span class="meta">${a.sessions.length} × · ${fmt(total)}</span>
+      </summary>
+      <div class="sessions">${sessionRows}</div>
+    `;
+    details.appendChild(block);
+  });
+}
+
+$$('.tabs button').forEach(b => b.addEventListener('click', () => {
+  $$('.tabs button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  const which = b.dataset.tab;
+  $('#summaryList').style.display = which === 'summary' ? '' : 'none';
+  $('#detailsList').style.display = which === 'details' ? '' : 'none';
+}));
+
+$('#backBtn').addEventListener('click', () => {
+  const gLast = state.globalSegments[state.globalSegments.length - 1];
+  if (gLast && gLast.end !== null) {
+    state.globalSegments.push({ start: Date.now(), end: null, speed: state.speed });
+  }
+  go('track');
+  updateTiles();
+  save();
+});
+
+$('#resetBtn').addEventListener('click', () => {
+  if (!confirm('Reset all timers and clear saved data?\nThis cannot be undone.')) return;
+  state.activities = [];
+  state.startedAt = null;
+  state.speed = 1;
+  state.globalSegments = [];
+  clearStorage();
+  go('setup');
+});
+
+function go(name) {
+  $$('.screen').forEach(s => s.classList.remove('active'));
+  $('#' + name).classList.add('active');
+}
+
+renderSetupInputs();
+load();
+</script>
+</body>
+</html>
