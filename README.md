@@ -52,22 +52,30 @@ Manual stopwatch + paper coding for free-operant duration data is slow and error
 - **Multiple simultaneous timers** — most stopwatches handle one channel at a time.
 - **Speed-adjusted playback** — scaling is automatic; no spreadsheet arithmetic at the end.
 - **Blind-tap UI** — large split tiles + haptic feedback let you log transitions without looking away from the video.
-- **Refresh-safe** — all state is persisted in `localStorage` under the key `stopwatch.v1`. An accidental refresh, tab close, or phone lock does not wipe your data.
+- **Multi-session history** — every video gets its own titled record, listed on the home screen, all stored locally in `localStorage` (key: `stopwatch.sessions.v1`). Refresh, tab close, or phone lock will not wipe your data.
 - **Built-in reporting** — total time, percentage, bout count, and per-bout timestamps appear in the summary view without manual aggregation.
 
 ## Data export
 
-To export the raw session data, open DevTools and run:
+The summary screen has an **Export CSV** button (this session only). The home screen has an **Export all (CSV)** link (every saved session). The CSV is long-format with one row per bout — pivot in Excel / Sheets / SPSS for totals and percentages.
 
-```js
-copy(localStorage.getItem('stopwatch.v1'))
+Columns:
+
+```
+session_title, session_started, activity, bout_number,
+start_video_time, end_video_time, duration_seconds, speed
 ```
 
-The JSON structure: `activities[].sessions[].segments[]`, where each segment has `start` (wall-clock ms), `end`, and `speed`. Multiply `(end − start) × speed` for the segment's effective duration.
+- `start_video_time` and `end_video_time` are speed-adjusted video time in `mm:ss`.
+- `duration_seconds` is an integer seconds count.
+- `speed` records the playback speed used during that bout (or `mixed` if the speed changed mid-bout).
 
 ## Reset / clear
 
-The **Reset all** button on the summary screen clears both in-memory state and `localStorage`. A confirmation prompt prevents accidental taps.
+- **Delete session** (summary screen) — removes the current session only; other history is preserved.
+- **Clear all history** (home screen footer link) — wipes every saved session.
+
+Both actions require confirmation.
 
 ## Tech
 
