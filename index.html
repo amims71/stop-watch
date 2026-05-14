@@ -126,12 +126,114 @@
 
   .footer-actions { display: flex; gap: 8px; padding-top: 8px; }
   .footer-actions .btn.danger { background: transparent; color: var(--idle-armed); border: 1px solid var(--idle-armed); }
+
+  /* --- Home / Landing --- */
+  #home {
+    display: none; height: 100dvh; overflow-y: auto; position: relative;
+    flex-direction: initial;
+    padding: calc(var(--safe-top) + 16px) 16px calc(var(--safe-bottom) + 96px);
+  }
+  #home.active { display: block; }
+  #home .home-inner { max-width: 620px; margin: 0 auto; }
+  #home .hero { padding: 16px 0 24px; }
+  #home .badge { display: inline-block; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-dim); padding: 4px 10px; border: 1px solid var(--divider); border-radius: 999px; margin-bottom: 14px; }
+  #home h1 { font-size: 30px; font-weight: 700; line-height: 1.15; margin-bottom: 10px; letter-spacing: -.5px; }
+  #home .tagline { color: var(--text-dim); font-size: 16px; line-height: 1.5; margin-bottom: 22px; }
+  #home .hero-cta { display: block; width: 100%; max-width: 360px; background: var(--tile-active); color: #fff; font-weight: 600; font-size: 16px; padding: 16px; border-radius: 14px; text-align: center; }
+  #home .hero-cta:active { background: #1f5dc7; }
+
+  #home section.info { padding: 22px 0; border-top: 1px solid var(--divider); }
+  #home h2 { font-size: 18px; font-weight: 600; margin-bottom: 12px; color: var(--text); }
+  #home p { line-height: 1.6; margin-bottom: 10px; color: var(--text); font-size: 15px; }
+  #home p:last-child { margin-bottom: 0; }
+  #home ul { padding-left: 20px; line-height: 1.75; font-size: 15px; }
+  #home ul li { margin-bottom: 4px; }
+  #home dl { margin: 4px 0; }
+  #home dt { font-weight: 600; margin-top: 14px; display: flex; align-items: center; gap: 10px; font-size: 15px; }
+  #home dt:first-child { margin-top: 0; }
+  #home dd { color: var(--text-dim); margin-left: 0; margin-top: 4px; line-height: 1.55; font-size: 14px; }
+  #home .kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; height: 28px; padding: 0 8px; background: var(--tile); border-radius: 7px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; font-weight: 700; color: var(--text); }
+  #home code { background: var(--tile); padding: 2px 6px; border-radius: 4px; font-size: 13px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  #home strong { color: var(--text); font-weight: 600; }
+  #home .footer-note { padding: 24px 0 8px; color: var(--text-dim); font-size: 12px; text-align: center; }
+  #home .footer-note a { color: var(--text-dim); text-decoration: underline; }
+
+  .floating-cta {
+    position: fixed; left: 12px; right: 12px;
+    bottom: calc(var(--safe-bottom) + 12px);
+    max-width: 596px; margin: 0 auto;
+    background: var(--tile-active); color: #fff;
+    padding: 16px; border-radius: 14px;
+    font-weight: 600; font-size: 16px; text-align: center;
+    box-shadow: 0 10px 30px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.04);
+    z-index: 100; font-family: inherit;
+    transition: transform .1s, background .15s;
+  }
+  .floating-cta:active { background: #1f5dc7; transform: scale(.98); }
 </style>
 </head>
 <body>
 
+<!-- HOME / LANDING -->
+<section id="home" class="screen">
+  <div class="home-inner">
+    <header class="hero">
+      <span class="badge">ABA · Behavior Coding</span>
+      <h1>Activity Stopwatch</h1>
+      <p class="tagline">A blind-tap, mobile-first duration recorder for coding video of contrived free-operant observations.</p>
+      <button class="hero-cta" id="homeStartTop">Start tracking</button>
+    </header>
+
+    <section class="info">
+      <h2>What this is</h2>
+      <p>A coding aid for <strong>contrived free-operant</strong> duration recording — a standard ABA measurement procedure where a child is free to engage with a chosen set of arranged activities, and the observer captures how long each engagement lasts.</p>
+      <p>Designed for the post-hoc step: you have the session on video, and you need to play it back and quantify engagement.</p>
+    </section>
+
+    <section class="info">
+      <h2>What it measures</h2>
+      <ul>
+        <li><strong>Total duration</strong> per activity</li>
+        <li><strong>Frequency</strong> — number of engagement bouts per activity</li>
+        <li><strong>Per-bout duration</strong> with start/end timestamps in video time</li>
+        <li><strong>Speed-adjusted</strong> playback — watch at 1.25× / 1.5× / 2×; totals reflect real engagement duration</li>
+      </ul>
+    </section>
+
+    <section class="info">
+      <h2>How it works</h2>
+      <p>Each activity is a large tile, split into two tap zones — designed for blind operation while your eyes stay on the video:</p>
+      <dl>
+        <dt><span class="kbd">+</span> Left half — toggle</dt>
+        <dd>Start or stop this activity. Other running activities continue. Use when behaviors overlap.</dd>
+        <dt><span class="kbd">▶</span> Right half — solo</dt>
+        <dd>Stop everything else and run only this one. Use when the child cleanly switches.</dd>
+        <dt><span class="kbd">■</span> Bottom bar — idle</dt>
+        <dd>Stop all activities. Child is doing nothing of interest.</dd>
+        <dt><span class="kbd">1×</span> Top pill — speed</dt>
+        <dd>Cycle 1× → 1.25× → 1.5× → 1.75× → 2×. Splits ongoing bouts so totals stay accurate.</dd>
+      </dl>
+      <p>Distinct haptic patterns confirm every action so you don't have to look at the phone.</p>
+    </section>
+
+    <section class="info">
+      <h2>Why it helps</h2>
+      <ul>
+        <li>Multiple <strong>simultaneous timers</strong> — most stopwatches handle one channel at a time</li>
+        <li>Automatic <strong>speed scaling</strong> — no spreadsheet arithmetic at the end</li>
+        <li><strong>Refresh-safe</strong> — state is persisted to <code>localStorage</code></li>
+        <li>Built-in summary, per-bout detail, and percentage view</li>
+      </ul>
+    </section>
+
+    <p class="footer-note">Source on <a href="https://github.com/amims71/stop-watch" target="_blank" rel="noopener">GitHub</a></p>
+  </div>
+
+  <button class="floating-cta" id="homeStartFloat">Start tracking →</button>
+</section>
+
 <!-- SETUP -->
-<section id="setup" class="screen active">
+<section id="setup" class="screen">
   <h1>Setup activities</h1>
   <div class="setup-row">
     <label for="count">Count</label>
@@ -516,8 +618,20 @@ function go(name) {
   $('#' + name).classList.add('active');
 }
 
+const ONBOARDED_KEY = 'stopwatch.onboarded';
+function startFromHome() {
+  try { localStorage.setItem(ONBOARDED_KEY, '1'); } catch (e) {}
+  go('setup');
+}
+$('#homeStartTop').addEventListener('click', startFromHome);
+$('#homeStartFloat').addEventListener('click', startFromHome);
+
 renderSetupInputs();
-load();
+if (!load()) {
+  let onboarded = false;
+  try { onboarded = localStorage.getItem(ONBOARDED_KEY) === '1'; } catch (e) {}
+  go(onboarded ? 'setup' : 'home');
+}
 </script>
 </body>
 </html>
