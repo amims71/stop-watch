@@ -610,7 +610,7 @@ $('#resetBtn').addEventListener('click', () => {
   state.speed = 1;
   state.globalSegments = [];
   clearStorage();
-  go('setup');
+  go('home');
 });
 
 function go(name) {
@@ -618,20 +618,12 @@ function go(name) {
   $('#' + name).classList.add('active');
 }
 
-const ONBOARDED_KEY = 'stopwatch.onboarded';
-function startFromHome() {
-  try { localStorage.setItem(ONBOARDED_KEY, '1'); } catch (e) {}
-  go('setup');
-}
+function startFromHome() { go('setup'); }
 $('#homeStartTop').addEventListener('click', startFromHome);
 $('#homeStartFloat').addEventListener('click', startFromHome);
 
 renderSetupInputs();
-if (!load()) {
-  let onboarded = false;
-  try { onboarded = localStorage.getItem(ONBOARDED_KEY) === '1'; } catch (e) {}
-  go(onboarded ? 'setup' : 'home');
-}
+if (!load()) go('home');
 </script>
 </body>
 </html>
